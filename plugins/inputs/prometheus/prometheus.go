@@ -34,6 +34,9 @@ type Prometheus struct {
 
 	// True if we want to map to statsd-type names with dot separators
 	DotSeparator bool
+
+	// Optional prefix to add to metric names for statsd-type output
+	MetricPrefix string
 }
 
 var sampleConfig = `
@@ -52,6 +55,9 @@ var sampleConfig = `
 
   ## Output using statsd-type dot separators?
   # dot_separator = true
+
+  ## Optional prefix to add to metrics names
+  # metric_prefix = "mymetric"
 `
 
 func (p *Prometheus) SampleConfig() string {
@@ -151,6 +157,9 @@ func (p *Prometheus) gatherURL(url string, acc telegraf.Accumulator) error {
 		mName := metric.Name()
 		if p.DotSeparator == true {
 			mName = convert_linkerd(metric.Name())
+		}
+		if p.MetricPrefix != "" {
+			mName = p.MetricPrefix + "." + mName
 		}
 		acc.AddFields(mName, metric.Fields(), tags, collectDate)
 	}
