@@ -3,14 +3,16 @@ package prometheus
 import (
 	"errors"
 	"fmt"
-	"github.com/influxdata/telegraf"
-	"github.com/influxdata/telegraf/internal"
-	"github.com/influxdata/telegraf/plugins/inputs"
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/influxdata/telegraf"
+	"github.com/influxdata/telegraf/internal"
+	"github.com/influxdata/telegraf/plugins/inputs"
 )
 
 const acceptHeader = `application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.7,text/plain;version=0.0.4;q=0.3`
@@ -29,6 +31,9 @@ type Prometheus struct {
 	SSLKey string `toml:"ssl_key"`
 	// Use SSL but skip chain & host verification
 	InsecureSkipVerify bool
+
+	// True if we want to map to statsd-type names with dot separators
+	DotSeparator bool
 }
 
 var sampleConfig = `
@@ -44,6 +49,9 @@ var sampleConfig = `
   # ssl_key = /path/to/keyfile
   ## Use SSL but skip chain & host verification
   # insecure_skip_verify = false
+
+  ## Output using statsd-type dot separators?
+  # dot_separator = true
 `
 
 func (p *Prometheus) SampleConfig() string {
@@ -140,7 +148,11 @@ func (p *Prometheus) gatherURL(url string, acc telegraf.Accumulator) error {
 	for _, metric := range metrics {
 		tags := metric.Tags()
 		tags["url"] = url
-		acc.AddFields(metric.Name(), metric.Fields(), tags, collectDate)
+		mName := metric.Name()
+		if p.DotSeparator == true {
+			mName = convert_linkerd(metric.Name())
+		}
+		acc.AddFields(mName, metric.Fields(), tags, collectDate)
 	}
 
 	return nil
@@ -150,4 +162,9 @@ func init() {
 	inputs.Add("prometheus", func() telegraf.Input {
 		return &Prometheus{}
 	})
+}
+
+// Convert the metric name we received into a statsd-type name with dots.
+func convert_linkerd(metric_name string) string {
+	return strings.Replace(metric_name, ":", ".", -1)
 }
