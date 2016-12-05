@@ -53,7 +53,7 @@ var sampleConfig = `
   ## Use SSL but skip chain & host verification
   # insecure_skip_verify = false
 
-  ## Output using statsd-type dot separators?
+  ## Output using statsd-type dot separators instead of colon?
   # dot_separator = true
 
   ## Optional prefix to add to metrics names
@@ -159,7 +159,11 @@ func (p *Prometheus) gatherURL(url string, acc telegraf.Accumulator) error {
 			mName = convert_linkerd(metric.Name())
 		}
 		if p.MetricPrefix != "" {
-			mName = p.MetricPrefix + "." + mName
+			separator := ":"
+			if p.DotSeparator == true {
+				separator = "."
+			}
+			mName = p.MetricPrefix + separator + mName
 		}
 		acc.AddFields(mName, metric.Fields(), tags, collectDate)
 	}
