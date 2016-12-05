@@ -23,6 +23,9 @@ go_gc_duration_seconds_count 7
 # HELP go_goroutines Number of goroutines that currently exist.
 # TYPE go_goroutines gauge
 go_goroutines 15
+# HELP test:classes:total Number of classes that currently exist.
+# TYPE test:classes:total gauge
+test:classes:total 0.0
 `
 
 func TestPrometheusGeneratesMetrics(t *testing.T) {
@@ -42,4 +45,28 @@ func TestPrometheusGeneratesMetrics(t *testing.T) {
 
 	assert.True(t, acc.HasFloatField("go_gc_duration_seconds", "count"))
 	assert.True(t, acc.HasFloatField("go_goroutines", "gauge"))
+	assert.True(t, acc.HasFloatField("test:classes:total", "gauge"))
+}
+
+// Test that the options to change the separator to a period, and add a prefix
+// to a metric name, are working as expected.
+func TestPrometheusUsesOptions(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, sampleTextFormat)
+	}))
+	defer ts.Close()
+
+	p := &Prometheus{
+		Urls:         []string{ts.URL},
+		DotSeparator: true,
+		MetricPrefix: "mytest",
+	}
+
+	var acc testutil.Accumulator
+	// acc.SetDebug(true)
+
+	err := p.Gather(&acc)
+	require.NoError(t, err)
+
+	assert.True(t, acc.HasFloatField("mytest.test.classes.total", "gauge"))
 }
